@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, request, abort, jsonify
+from flask import Flask, flash, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import random
@@ -138,11 +138,11 @@ def create_app(test_config=None):
       new_answer = body.get('answer', None)
       new_difficulty = body.get('difficulty', None)
       new_category = body.get('category', None)
-      search = body.get('search', None)
+      searchTerm = body.get('searchTerm', None)
       try:
 
-        if search:
-          questions = Question.query.order_by(Question.id).filter(Question.question.ilike('%{}%'.format(search)))
+        if searchTerm:
+          questions = Question.query.order_by(Question.id).filter(Question.question.ilike('%{}%'.format(searchTerm)))
           page = request.args.get('page', 1, type=int)
           start = (page - 1) * QUESTIONS_PER_PAGE
           end = start + 10
@@ -150,14 +150,14 @@ def create_app(test_config=None):
 
           return jsonify({
             'success': True,
-            'searchTerm': search,
+            'searchTerm': searchTerm,
             'questions': searched_questions[start:end],
             'total_questions': len(searched_questions)
           })
         else:
           question = Question(question=new_question, answer=new_answer, category=new_category, difficulty=new_difficulty)
           question.insert()
-
+          
           page = request.args.get('page', 1, type=int)
           start = (page - 1) * QUESTIONS_PER_PAGE
           end = start + 10
@@ -188,22 +188,23 @@ def create_app(test_config=None):
   Try using the word "title" to start. 
   DONE
   '''
-    @app.route('/categories/category=<int:category_id>/questions', methods=['GET'])
+    @app.route('/categories/<int:category_id>/questions', methods=['GET'])
 
     # matthewbailin@matthewbailin trivia % curl -X POST \
     # -H "Content-Type: application/json" \
     # -d '{"search": "Tom"}' \
     # http://127.0.0.1:5000/questions | jq '.'
     def get_questions_by_category(category_id):
+      questions = Question.query.order_by(Question.id).filter(Question.category == category_id).all()
+      if len(questions) == 0:
+          return abort(404)
       try:
-        questions = Question.query.order_by(Question.id).filter(Question.category == category_id).all()
-        if len(questions) == 0:
-          abort(404)
         page = request.args.get('page', 1, type=int)
         start = (page - 1) * QUESTIONS_PER_PAGE
         end = start + 10
         formatted_questions = [question.format() for question in questions]
-        current_category = Category.query.filter(Category.id == category_id).one_or_none()
+        current_category = Category.query.get(category_id).type
+
         return jsonify({
               'success': True,
               'questions': formatted_questions[start:end],
